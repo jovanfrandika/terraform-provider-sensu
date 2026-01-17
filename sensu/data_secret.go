@@ -7,6 +7,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
+// Note: Secret type is defined in resource_secret.go
+
 func dataSourceSecret() *schema.Resource {
 	return &schema.Resource{
 		Read: dataSourceSecretRead,
@@ -22,7 +24,7 @@ func dataSourceSecret() *schema.Resource {
 				Description: "The secret ID (e.g., environment variable name for Env provider)",
 			},
 
-			"provider": &schema.Schema{
+			"secrets_provider": &schema.Schema{
 				Type:        schema.TypeString,
 				Computed:    true,
 				Description: "The name of the secrets provider (e.g., env)",
@@ -38,10 +40,14 @@ func dataSourceSecret() *schema.Resource {
 
 func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
-	config.SaveNamespace(config.determineNamespace(d))
+	namespace := config.determineNamespace(d)
+	config.SaveNamespace(namespace)
 	name := d.Get("name").(string)
 
-	secret, err := config.client.FetchSecret(name)
+	var secret Secret
+	path := fmt.Sprintf("/api/enterprise/secrets/v1/namespaces/%s/secrets/%s", namespace, name)
+
+	err := config.client.Get(path, &secret)
 	if err != nil {
 		return fmt.Errorf("Unable to retrieve secret %s: %s", name, err)
 	}
@@ -49,10 +55,10 @@ func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	log.Printf("[DEBUG] Retrieved secret %s: %#v", name, secret)
 
 	d.SetId(name)
-	d.Set("name", name)
-	d.Set("namespace", secret.ObjectMeta.Namespace)
-	d.Set("id", secret.ID)
-	d.Set("provider", secret.Provider)
+	d.Set("name", secret.Metadata.Name)
+	d.Set("namespace", secret.Metadata.Namespace)
+	d.Set("id", secret.Spec.ID)
+	d.Set("secrets_provider", secret.Spec.Provider)
 
 	return nil
 }

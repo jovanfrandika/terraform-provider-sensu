@@ -21,7 +21,7 @@ func TestAccResourceSecret_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"sensu_secret.secret_1", "id", "SENSU_TEST_SECRET"),
 					resource.TestCheckResourceAttr(
-						"sensu_secret.secret_1", "provider", "env"),
+						"sensu_secret.secret_1", "secrets_provider", "env"),
 				),
 			},
 		},
@@ -41,7 +41,7 @@ func TestAccResourceSecret_update(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"sensu_secret.secret_1", "id", "SENSU_TEST_SECRET"),
 					resource.TestCheckResourceAttr(
-						"sensu_secret.secret_1", "provider", "env"),
+						"sensu_secret.secret_1", "secrets_provider", "env"),
 				),
 			},
 			resource.TestStep{
@@ -52,7 +52,7 @@ func TestAccResourceSecret_update(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"sensu_secret.secret_1", "id", "SENSU_TEST_SECRET_UPDATED"),
 					resource.TestCheckResourceAttr(
-						"sensu_secret.secret_1", "provider", "env"),
+						"sensu_secret.secret_1", "secrets_provider", "env"),
 				),
 			},
 		},
@@ -92,7 +92,7 @@ func TestAccResourceSecret_providerChange(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"sensu_secret.secret_1", "name", "secret_1"),
 					resource.TestCheckResourceAttr(
-						"sensu_secret.secret_1", "provider", "env"),
+						"sensu_secret.secret_1", "secrets_provider", "env"),
 				),
 			},
 			resource.TestStep{
@@ -101,7 +101,7 @@ func TestAccResourceSecret_providerChange(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"sensu_secret.secret_1", "name", "secret_1"),
 					resource.TestCheckResourceAttr(
-						"sensu_secret.secret_1", "provider", "vault"),
+						"sensu_secret.secret_1", "secrets_provider", "vault"),
 					testAccCheckSecretRecreated("sensu_secret.secret_1"),
 				),
 			},
@@ -121,7 +121,7 @@ const testAccResourceSecret_basic = `
   resource "sensu_secret" "secret_1" {
     name = "secret_1"
     id = "SENSU_TEST_SECRET"
-    provider = "env"
+    secrets_provider = "env"
   }
 `
 
@@ -129,7 +129,7 @@ const testAccResourceSecret_update = `
   resource "sensu_secret" "secret_1" {
     name = "secret_1"
     id = "SENSU_TEST_SECRET_UPDATED"
-    provider = "env"
+    secrets_provider = "env"
   }
 `
 
@@ -137,13 +137,13 @@ const testAccResourceSecret_multiple = `
   resource "sensu_secret" "secret_1" {
     name = "secret_1"
     id = "SENSU_TEST_SECRET_1"
-    provider = "env"
+    secrets_provider = "env"
   }
 
   resource "sensu_secret" "secret_2" {
     name = "secret_2"
     id = "SENSU_TEST_SECRET_2"
-    provider = "env"
+    secrets_provider = "env"
   }
 `
 
@@ -151,6 +151,6 @@ const testAccResourceSecret_providerChange = `
   resource "sensu_secret" "secret_1" {
     name = "secret_1"
     id = "SENSU_TEST_SECRET"
-    provider = "vault"
+    secrets_provider = "vault"
   }
 `

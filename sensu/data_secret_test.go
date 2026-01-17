@@ -20,7 +20,7 @@ func TestAccDataSourceSecret_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"data.sensu_secret.secret_1", "id", "SENSU_TEST_SECRET"),
 					resource.TestCheckResourceAttr(
-						"data.sensu_secret.secret_1", "provider", "env"),
+						"data.sensu_secret.secret_1", "secrets_provider", "env"),
 				),
 			},
 		},
@@ -31,7 +31,7 @@ const testAccDataSourceSecret_basic = `
   resource "sensu_secret" "secret_1" {
     name = "secret_1"
     id = "SENSU_TEST_SECRET"
-    provider = "env"
+    secrets_provider = "env"
   }
 
   data "sensu_secret" "secret_1" {

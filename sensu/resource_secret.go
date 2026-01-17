@@ -5,8 +5,27 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	v2 "github.com/sensu/core/v2"
 )
+
+// SecretMetadata represents the metadata section of a Sensu secret
+type SecretMetadata struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// SecretSpec represents the spec section of a Sensu secret
+type SecretSpec struct {
+	ID       string `json:"id"`
+	Provider string `json:"provider"`
+}
+
+// Secret represents a Sensu Enterprise secret resource
+type Secret struct {
+	Type       string         `json:"type"`
+	APIVersion string         `json:"api_version"`
+	Metadata   SecretMetadata `json:"metadata"`
+	Spec       SecretSpec     `json:"spec"`
+}
 
 func resourceSecret() *schema.Resource {
 	return &schema.Resource{
@@ -28,7 +47,7 @@ func resourceSecret() *schema.Resource {
 				Description: "The secret ID (e.g., environment variable name for Env provider)",
 			},
 
-			"provider": &schema.Schema{
+			"secrets_provider": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
@@ -46,22 +65,32 @@ func resourceSecretCreate(d *schema.ResourceData, meta interface{}) error {
 	name := d.Get("name").(string)
 	namespace := config.determineNamespace(d)
 
-	secret := &v2.Secret{
-		ObjectMeta: v2.ObjectMeta{
+	secret := &Secret{
+		Type:       "Secret",
+		APIVersion: "secrets/v1",
+		Metadata: SecretMetadata{
 			Name:      name,
 			Namespace: namespace,
 		},
-		ID:       d.Get("id").(string),
-		Provider: d.Get("provider").(string),
+		Spec: SecretSpec{
+			ID:       d.Get("id").(string),
+			Provider: d.Get("secrets_provider").(string),
+		},
 	}
 
 	log.Printf("[DEBUG] Creating secret %s in namespace %s: %#v", name, namespace, secret)
 
-	if err := secret.Validate(); err != nil {
-		return fmt.Errorf("Invalid secret %s: %s", name, err)
+	// Validate required fields
+	if secret.Spec.ID == "" {
+		return fmt.Errorf("Secret ID is required for secret %s", name)
+	}
+	if secret.Spec.Provider == "" {
+		return fmt.Errorf("Secret provider is required for secret %s", name)
 	}
 
-	if err := config.client.CreateSecret(secret); err != nil {
+	// Use the enterprise secrets API endpoint
+	path := fmt.Sprintf("/api/enterprise/secrets/v1/namespaces/%s/secrets/%s", namespace, name)
+	if err := config.client.Put(path, secret); err != nil {
 		return fmt.Errorf("Error creating secret %s: %s", name, err)
 	}
 
@@ -72,11 +101,16 @@ func resourceSecretCreate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
-	config.SaveNamespace(config.determineNamespace(d))
+	namespace := config.determineNamespace(d)
+	config.SaveNamespace(namespace)
 	name := d.Id()
 
-	secret, err := config.client.FetchSecret(name)
+	var secret Secret
+	path := fmt.Sprintf("/api/enterprise/secrets/v1/namespaces/%s/secrets/%s", namespace, name)
+
+	err := config.client.Get(path, &secret)
 	if err != nil {
+		// Check if it's a not found error
 		if err.Error() == "not found" {
 			d.SetId("")
 			return nil
@@ -86,37 +120,48 @@ func resourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 
 	log.Printf("[DEBUG] Retrieved secret %s: %#v", name, secret)
 
-	d.Set("name", name)
-	d.Set("namespace", secret.ObjectMeta.Namespace)
-	d.Set("id", secret.ID)
-	d.Set("provider", secret.Provider)
+	d.Set("name", secret.Metadata.Name)
+	d.Set("namespace", secret.Metadata.Namespace)
+	d.Set("id", secret.Spec.ID)
+	d.Set("secrets_provider", secret.Spec.Provider)
 
 	return nil
 }
 
 func resourceSecretUpdate(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
-	config.SaveNamespace(config.determineNamespace(d))
+	namespace := config.determineNamespace(d)
+	config.SaveNamespace(namespace)
 	name := d.Id()
 
-	secret, err := config.client.FetchSecret(name)
+	// Fetch current secret
+	var secret Secret
+	path := fmt.Sprintf("/api/enterprise/secrets/v1/namespaces/%s/secrets/%s", namespace, name)
+
+	err := config.client.Get(path, &secret)
 	if err != nil {
 		return fmt.Errorf("Unable to retrieve secret %s: %s", name, err)
 	}
 
+	// Update the ID if it changed
 	if d.HasChange("id") {
-		secret.ID = d.Get("id").(string)
+		secret.Spec.ID = d.Get("id").(string)
 	}
 
-	// Note: provider is ForceNew, so it cannot be changed without recreating the resource
+	// Note: secrets_provider is ForceNew, so it cannot be changed without recreating the resource
 
 	log.Printf("[DEBUG] Updating secret %s: %#v", name, secret)
 
-	if err := secret.Validate(); err != nil {
-		return fmt.Errorf("Invalid secret %s: %s", name, err)
+	// Validate required fields
+	if secret.Spec.ID == "" {
+		return fmt.Errorf("Secret ID is required for secret %s", name)
+	}
+	if secret.Spec.Provider == "" {
+		return fmt.Errorf("Secret provider is required for secret %s", name)
 	}
 
-	if err := config.client.UpdateSecret(secret); err != nil {
+	// Update via PUT
+	if err := config.client.Put(path, &secret); err != nil {
 		return fmt.Errorf("Error updating secret %s: %s", name, err)
 	}
 
@@ -125,13 +170,14 @@ func resourceSecretUpdate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceSecretDelete(d *schema.ResourceData, meta interface{}) error {
 	config := meta.(*Config)
-	config.SaveNamespace(config.determineNamespace(d))
+	namespace := config.determineNamespace(d)
+	config.SaveNamespace(namespace)
 	name := d.Id()
-	namespace := config.namespace
 
 	log.Printf("[DEBUG] Deleting secret %s from namespace %s", name, namespace)
 
-	if err := config.client.DeleteSecret(namespace, name); err != nil {
+	path := fmt.Sprintf("/api/enterprise/secrets/v1/namespaces/%s/secrets/%s", namespace, name)
+	if err := config.client.Delete(path); err != nil {
 		return fmt.Errorf("Unable to delete secret %s: %s", name, err)
 	}
 
