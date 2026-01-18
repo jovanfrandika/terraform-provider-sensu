@@ -18,7 +18,7 @@ func dataSourceSecret() *schema.Resource {
 			"name": dataSourceNameSchema,
 
 			// Computed
-			"id": &schema.Schema{
+			"secret_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Computed:    true,
 				Description: "The secret ID (e.g., environment variable name for Env provider)",
@@ -31,8 +31,9 @@ func dataSourceSecret() *schema.Resource {
 			},
 
 			"namespace": &schema.Schema{
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The namespace the secret belongs to",
 			},
 		},
 	}
@@ -57,7 +58,7 @@ func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	d.SetId(name)
 	d.Set("name", secret.Metadata.Name)
 	d.Set("namespace", secret.Metadata.Namespace)
-	d.Set("id", secret.Spec.ID)
+	d.Set("secret_id", secret.Spec.ID)
 	d.Set("secrets_provider", secret.Spec.Provider)
 
 	return nil

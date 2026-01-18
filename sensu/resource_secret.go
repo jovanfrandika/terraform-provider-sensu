@@ -41,7 +41,7 @@ func resourceSecret() *schema.Resource {
 			// Required
 			"name": resourceNameSchema,
 
-			"id": &schema.Schema{
+			"secret_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
 				Description: "The secret ID (e.g., environment variable name for Env provider)",
@@ -73,7 +73,7 @@ func resourceSecretCreate(d *schema.ResourceData, meta interface{}) error {
 			Namespace: namespace,
 		},
 		Spec: SecretSpec{
-			ID:       d.Get("id").(string),
+			ID:       d.Get("secret_id").(string),
 			Provider: d.Get("secrets_provider").(string),
 		},
 	}
@@ -122,7 +122,7 @@ func resourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 
 	d.Set("name", secret.Metadata.Name)
 	d.Set("namespace", secret.Metadata.Namespace)
-	d.Set("id", secret.Spec.ID)
+	d.Set("secret_id", secret.Spec.ID)
 	d.Set("secrets_provider", secret.Spec.Provider)
 
 	return nil
@@ -144,8 +144,8 @@ func resourceSecretUpdate(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	// Update the ID if it changed
-	if d.HasChange("id") {
-		secret.Spec.ID = d.Get("id").(string)
+	if d.HasChange("secret_id") {
+		secret.Spec.ID = d.Get("secret_id").(string)
 	}
 
 	// Note: secrets_provider is ForceNew, so it cannot be changed without recreating the resource
